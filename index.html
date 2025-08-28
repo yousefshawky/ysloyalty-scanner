@@ -134,7 +134,8 @@
         <div id="status"></div>
         
         <div class="instruction">
-            📱 Point your camera at the QR code on the loyalty card to automatically redirect to the form.
+            📱 Point your camera at the QR code on the loyalty card to test if it’s detected.  
+            If detected, you’ll first see a debug message before redirection.
         </div>
     </div>
 
@@ -149,8 +150,11 @@
         const statusDiv = document.getElementById('status');
         const overlay = container.querySelector('.scanner-overlay');
         
-        function showStatus(message, type = 'success') {
+        function showStatus(message, type = 'success', sticky = false) {
             statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+            if (!sticky && type === 'success') {
+                setTimeout(() => { statusDiv.innerHTML = ''; }, 4000);
+            }
         }
         
         function startScanner() {
@@ -172,10 +176,10 @@
                 })
                 .catch(function(error) {
                     console.error('Camera permission denied:', error);
-                    showStatus('❌ Camera access denied. Please allow camera access and try again.', 'error');
+                    showStatus('❌ Camera access denied. Please allow camera access and try again.', 'error', true);
                 });
             } else {
-                showStatus('❌ Camera not supported on this device.', 'error');
+                showStatus('❌ Camera not supported on this device.', 'error', true);
             }
         }
         
@@ -192,25 +196,25 @@
             video.playsInline = true;
             container.appendChild(video);
             
-            // ✅ Use QR-only reader
             codeReader = new ZXing.BrowserQRCodeReader();
             
             showStatus('📷 Scanner active - point camera at QR code', 'success');
             
-            // Start scanning
             codeReader.decodeFromVideoDevice(null, video, (result, err) => {
                 if (result) {
                     const scannedText = result.getText();
-                    console.log('QR detected:', scannedText);
+                    console.log('DEBUG: QR detected:', scannedText);
                     
-                    showStatus(`✅ Scanned: ${scannedText} - Redirecting...`, 'success');
-                    stopScanner();
+                    // ✅ Debug message instead of instant redirect
+                    showStatus(`🔍 DEBUG: QR detected: ${scannedText}`, 'success', true);
                     
+                    // Wait 3 seconds, then redirect (so you can SEE the debug message)
                     setTimeout(() => {
+                        stopScanner();
                         const googleFormUrl = 'https://docs.google.com/forms/d/e/1FAIpQLSdzinh-EN1eDM0ZXVJ_v-iFOuNm-ZJonrSJJk6zurjltvDY1A/viewform';
                         const prefilledUrl = `${googleFormUrl}?usp=pp_url&entry.317831200=${encodeURIComponent(scannedText)}`;
                         window.open(prefilledUrl, '_self');
-                    }, 1500);
+                    }, 3000);
                 }
                 
                 if (err && !(err instanceof ZXing.NotFoundException)) {
