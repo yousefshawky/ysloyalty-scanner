@@ -105,10 +105,7 @@
             color: white;
             display: none;
         }
-        #uploadBtn {
-            background: linear-gradient(135deg, #2196F3, #1976D2);
-            color: white;
-        }
+
         .status {
             text-align: center;
             padding: 15px;
@@ -149,34 +146,13 @@
             max-height: 150px;
             overflow-y: auto;
         }
-        input[type="file"] {
-            display: none;
-        }
-        .divider {
-            text-align: center;
-            margin: 20px 0;
-            color: #666;
-            position: relative;
-        }
-        .divider::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: #ddd;
-        }
-        .divider span {
-            background: white;
-            padding: 0 15px;
-        }
+
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🎯 QR Loyalty Card Scanner</h1>
-        <div class="instruction">Camera & File Upload QR Scanner</div>
+        <div class="instruction">Camera QR Scanner</div>
         
         <div id="scanner-container">
             <div class="instruction">Click "Start Camera" to begin scanning</div>
@@ -185,87 +161,197 @@
             <div class="scanner-overlay"></div>
         </div>
         
-        <button id="startScan">📷 Start Camera Scanner</button>
+        <button id="startScan">📷 Start Scanner</button>
         <button id="stopScan">⏹️ Stop Scanner</button>
-        
-        <div class="divider"><span>OR</span></div>
-        
-        <input type="file" id="fileInput" accept="image/*">
-        <button id="uploadBtn">📁 Upload QR Code Image</button>
         
         <div id="status"></div>
         
         <div class="instruction">
-            📷 <strong>Camera:</strong> Hold QR code steady in the frame<br>
-            📁 <strong>Upload:</strong> Select an image file containing a QR code<br>
-            💡 Ensure good lighting and clear visibility
+            📷 Hold QR code steady within the scanning frame<br>
+            💡 Ensure good lighting and the QR code is clearly visible
         </div>
         
         <div id="debug" class="debug" style="display: none;"></div>
     </div>
 
     <script>
-        // Simple QR Code detection using basic pattern recognition
+        // More accurate QR Code detection using strict finder pattern recognition
         function detectQRPattern(imageData) {
             const data = imageData.data;
             const width = imageData.width;
             const height = imageData.height;
             
-            // Convert to grayscale and look for finder patterns
-            const threshold = 128;
+            showDebug(`Analyzing image: ${width}x${height}`);
+            
+            const finderPatterns = findFinderPatterns(data, width, height);
+            showDebug(`Found ${finderPatterns.length} potential finder patterns`);
+            
+            if (finderPatterns.length < 3) {
+                return false; // Need at least 3 finder patterns for a valid QR code
+            }
+            
+            // Validate that finder patterns form a proper QR code structure
+            const validQR = validateQRStructure(finderPatterns);
+            showDebug(`QR structure validation: ${validQR}`);
+            
+            return validQR;
+        }
+        
+        function findFinderPatterns(data, width, height) {
             const patterns = [];
+            const minSize = 20;
+            const maxSize = 100;
             
-            // Look for dark squares (finder patterns) in corners
-            for (let y = 10; y < height - 50; y += 5) {
-                for (let x = 10; x < width - 50; x += 5) {
-                    if (checkFinderPattern(data, x, y, width, threshold)) {
-                        patterns.push({x, y});
+            // Look for finder patterns with strict criteria
+            for (let y = 10; y < height - maxSize; y += 3) {
+                for (let x = 10; x < width - maxSize; x += 3) {
+                    const pattern = analyzeFinderPattern(data, x, y, width, height);
+                    if (pattern.isValid) {
+                        patterns.push({x, y, size: pattern.size, confidence: pattern.confidence});
                     }
                 }
             }
             
-            // If we found potential finder patterns, this might be a QR code
-            return patterns.length >= 2;
+            return patterns;
         }
         
-        function checkFinderPattern(data, x, y, width, threshold) {
-            const size = 21; // Typical finder pattern size
-            let darkCount = 0;
-            let totalCount = 0;
+        function analyzeFinderPattern(data, startX, startY, width, height) {
+            const maxSize = Math.min(80, width - startX, height - startY);
             
-            for (let dy = 0; dy < size && y + dy < data.length / (width * 4); dy++) {
-                for (let dx = 0; dx < size && x + dx < width; dx++) {
-                    const i = ((y + dy) * width + (x + dx)) * 4;
-                    if (i + 2 < data.length) {
-                        const gray = (data[i] + data[i + 1] + data[i + 2]) / 3;
-                        if (gray < threshold) darkCount++;
-                        totalCount++;
+            // QR finder pattern has specific ratio: 1:1:3:1:1 (dark:light:dark:light:dark)
+            for (let size = 20; size < maxSize; size += 2) {
+                if (checkFinderPatternRatio(data, startX, startY, size, width)) {
+                    return {
+                        isValid: true,
+                        size: size,
+                        confidence: calculatePatternConfidence(data, startX, startY, size, width)
+                    };
+                }
+            }
+            
+            return { isValid: false, size: 0, confidence: 0 };
+        }
+        
+        function checkFinderPatternRatio(data, x, y, size, width) {
+            const centerX = x + Math.floor(size / 2);
+            const centerY = y + Math.floor(size / 2);
+            
+            // Check horizontal line through center for 1:1:3:1:1 pattern
+            const horizontalRatios = getLineRatios(data, centerX - Math.floor(size/2), centerY, size, width, true);
+            const verticalRatios = getLineRatios(data, centerX, centerY - Math.floor(size/2), size, width, false);
+            
+            return isValidFinderRatio(horizontalRatios) && isValidFinderRatio(verticalRatios);
+        }
+        
+        function getLineRatios(data, startX, startY, length, width, horizontal) {
+            const ratios = [];
+            let currentState = -1; // -1 = unknown, 0 = light, 1 = dark
+            let currentCount = 0;
+            
+            for (let i = 0; i < length; i++) {
+                const x = horizontal ? startX + i : startX;
+                const y = horizontal ? startY : startY + i;
+                
+                if (x >= 0 && x < width && y >= 0) {
+                    const pixelIndex = (y * width + x) * 4;
+                    const gray = (data[pixelIndex] + data[pixelIndex + 1] + data[pixelIndex + 2]) / 3;
+                    const isDark = gray < 128;
+                    
+                    if (currentState === -1) {
+                        currentState = isDark ? 1 : 0;
+                        currentCount = 1;
+                    } else if ((isDark && currentState === 1) || (!isDark && currentState === 0)) {
+                        currentCount++;
+                    } else {
+                        ratios.push(currentCount);
+                        currentState = isDark ? 1 : 0;
+                        currentCount = 1;
                     }
                 }
             }
             
-            const ratio = darkCount / totalCount;
-            return ratio > 0.3 && ratio < 0.7; // Finder patterns have specific dark/light ratios
+            if (currentCount > 0) {
+                ratios.push(currentCount);
+            }
+            
+            return ratios;
         }
         
-        // Try to extract data using basic analysis
+        function isValidFinderRatio(ratios) {
+            if (ratios.length !== 5) return false;
+            
+            // Check for 1:1:3:1:1 ratio (with some tolerance)
+            const total = ratios.reduce((sum, val) => sum + val, 0);
+            const unit = total / 7; // Total should be 7 units
+            
+            const tolerance = 0.5;
+            return (
+                Math.abs(ratios[0] - unit) < unit * tolerance &&
+                Math.abs(ratios[1] - unit) < unit * tolerance &&
+                Math.abs(ratios[2] - unit * 3) < unit * tolerance &&
+                Math.abs(ratios[3] - unit) < unit * tolerance &&
+                Math.abs(ratios[4] - unit) < unit * tolerance
+            );
+        }
+        
+        function calculatePatternConfidence(data, x, y, size, width) {
+            // Calculate confidence based on pattern clarity
+            let darkCount = 0, lightCount = 0;
+            const centerX = x + Math.floor(size / 2);
+            const centerY = y + Math.floor(size / 2);
+            const innerSize = Math.floor(size * 0.6);
+            
+            // Check inner square (should be mostly dark)
+            for (let dy = -Math.floor(innerSize/2); dy < Math.floor(innerSize/2); dy++) {
+                for (let dx = -Math.floor(innerSize/2); dx < Math.floor(innerSize/2); dx++) {
+                    const pixelIndex = ((centerY + dy) * width + (centerX + dx)) * 4;
+                    if (pixelIndex >= 0 && pixelIndex < data.length) {
+                        const gray = (data[pixelIndex] + data[pixelIndex + 1] + data[pixelIndex + 2]) / 3;
+                        if (gray < 128) darkCount++; else lightCount++;
+                    }
+                }
+            }
+            
+            const totalPixels = darkCount + lightCount;
+            return totalPixels > 0 ? darkCount / totalPixels : 0;
+        }
+        
+        function validateQRStructure(patterns) {
+            if (patterns.length < 3) return false;
+            
+            // Sort patterns by confidence and take the best 3
+            patterns.sort((a, b) => b.confidence - a.confidence);
+            const topPatterns = patterns.slice(0, 3);
+            
+            // Check if patterns form a reasonable triangle (QR code structure)
+            const distances = [];
+            for (let i = 0; i < topPatterns.length; i++) {
+                for (let j = i + 1; j < topPatterns.length; j++) {
+                    const dx = topPatterns[i].x - topPatterns[j].x;
+                    const dy = topPatterns[i].y - topPatterns[j].y;
+                    distances.push(Math.sqrt(dx * dx + dy * dy));
+                }
+            }
+            
+            // All finder patterns should be roughly the same distance apart
+            const avgDistance = distances.reduce((sum, d) => sum + d, 0) / distances.length;
+            const tolerance = avgDistance * 0.3;
+            
+            return distances.every(d => Math.abs(d - avgDistance) < tolerance) && avgDistance > 50;
+        }
+        
+        // Try to extract data using strict validation
         function extractQRData(imageData) {
-            // This is a simplified approach - in reality, QR decoding is very complex
-            // We'll look for URL patterns or text patterns in the image
+            showDebug('Attempting to extract QR data...');
             
-            const canvas = document.createElement('canvas');
-            canvas.width = imageData.width;
-            canvas.height = imageData.height;
-            const ctx = canvas.getContext('2d');
-            ctx.putImageData(imageData, 0, 0);
-            
-            // For demonstration, we'll return a placeholder if QR pattern is detected
             if (detectQRPattern(imageData)) {
-                // In a real scenario, you'd decode the actual data here
-                // For now, return a test value to show the system works
-                return "QR_CODE_DETECTED_" + Date.now();
+                showDebug('Valid QR structure confirmed');
+                // In a real implementation, you would decode the actual QR data here
+                // For now, return a test value since we confirmed it's a real QR code
+                return "VALID_QR_CODE_" + Date.now();
             }
             
+            showDebug('No valid QR structure found');
             return null;
         }
 
@@ -276,8 +362,6 @@
         
         const startBtn = document.getElementById('startScan');
         const stopBtn = document.getElementById('stopScan');
-        const uploadBtn = document.getElementById('uploadBtn');
-        const fileInput = document.getElementById('fileInput');
         const container = document.getElementById('scanner-container');
         const statusDiv = document.getElementById('status');
         const debugDiv = document.getElementById('debug');
@@ -395,45 +479,7 @@
             animationId = requestAnimationFrame(scanLoop);
         }
         
-        function handleFileUpload() {
-            const file = fileInput.files[0];
-            if (!file) return;
-            
-            showDebug(`Processing uploaded file: ${file.name}`);
-            showStatus('Processing image...', 'info');
-            
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = new Image();
-                img.onload = function() {
-                    showDebug(`Image loaded: ${img.width}x${img.height}`);
-                    
-                    // Draw image to canvas
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    ctx.drawImage(img, 0, 0);
-                    
-                    // Try to detect QR code
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    
-                    if (detectQRPattern(imageData)) {
-                        const qrData = extractQRData(imageData);
-                        if (qrData) {
-                            showDebug(`QR PATTERN DETECTED in upload: ${qrData}`);
-                            handleQRDetected(qrData);
-                        } else {
-                            showStatus('QR pattern found but could not extract data. Try a clearer image.', 'error', true);
-                        }
-                    } else {
-                        showStatus('No QR code pattern detected in image. Try a different image.', 'error', true);
-                        showDebug('No QR pattern detected in uploaded image');
-                    }
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
-        
+
         function handleQRDetected(scannedText) {
             showStatus(`✅ QR Code Detected!<br><strong>${scannedText}</strong><br>Redirecting in 3 seconds...`, 'success', true);
             
@@ -497,8 +543,6 @@
         // Event listeners
         startBtn.addEventListener('click', startScanner);
         stopBtn.addEventListener('click', stopScanner);
-        uploadBtn.addEventListener('click', () => fileInput.click());
-        fileInput.addEventListener('change', handleFileUpload);
         
         // Stop scanner when page becomes hidden
         document.addEventListener('visibilitychange', function() {
