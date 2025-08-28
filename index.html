@@ -140,6 +140,11 @@
             border-radius: 12px !important;
             overflow: hidden;
         }
+        .scanner-placeholder {
+            text-align: center;
+            color: #666;
+            padding: 20px;
+        }
     </style>
 </head>
 <body>
@@ -148,7 +153,7 @@
         <div class="instruction">Camera QR Scanner</div>
         
         <div id="reader">
-            <div class="instruction">Click "Start Scanner" to begin</div>
+            <div class="scanner-placeholder">Click "Start Scanner" to begin</div>
             <div class="scanner-overlay"></div>
         </div>
         
@@ -175,6 +180,7 @@
         const statusDiv = document.getElementById('status');
         const debugDiv = document.getElementById('debug');
         const overlay = readerDiv.querySelector('.scanner-overlay');
+        const placeholder = readerDiv.querySelector('.scanner-placeholder');
         
         function showStatus(message, type = 'success', sticky = false) {
             statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
@@ -199,6 +205,9 @@
             
             showDebug('Initializing QR scanner...');
             
+            // Remove the placeholder text
+            placeholder.style.display = 'none';
+            
             // Initialize the scanner
             html5QrcodeScanner = new Html5Qrcode("reader");
             
@@ -217,7 +226,10 @@
                         showDebug(`Found ${cameras.length} camera(s)`);
                         
                         // Prefer back camera if available
-                        const backCamera = cameras.find(camera => camera.label.toLowerCase().includes('back'));
+                        const backCamera = cameras.find(camera => 
+                            camera.label.toLowerCase().includes('back') || 
+                            camera.label.toLowerCase().includes('rear')
+                        );
                         const cameraId = backCamera ? backCamera.id : cameras[0].id;
                         
                         showDebug(`Using camera: ${backCamera ? 'Back' : 'First available'}`);
@@ -240,12 +252,15 @@
                     stopBtn.style.display = 'block';
                     readerDiv.classList.add('active');
                     overlay.style.display = 'block';
-                    readerDiv.querySelector('.instruction').style.display = 'none';
                     
                     showStatus('📷 Scanner active - point camera at QR code', 'success');
                     showDebug('Scanner started successfully');
                 })
                 .catch(err => {
+                    // Show the placeholder again if initialization failed
+                    placeholder.style.display = 'block';
+                    placeholder.textContent = 'Failed to start camera. Click "Start Scanner" to try again.';
+                    
                     showStatus('❌ Failed to start scanner: ' + err, 'error', true);
                     showDebug('Scanner error: ' + err);
                 });
@@ -259,10 +274,12 @@
         function onScanFailure(error) {
             // Most errors are just because no QR code is detected yet
             // Only show errors that aren't the expected "not found" type
-            if (!error || 
-                (typeof error === 'string' && error.includes('No MultiFormat Readers')) ||
-                (error && error.message && error.message.includes('No MultiFormat Readers'))) {
-                return;
+            if (!error) return;
+            
+            if (typeof error === 'string') {
+                if (error.includes('No MultiFormat Readers') || error.includes('NotFoundException')) return;
+            } else if (error.message) {
+                if (error.message.includes('No MultiFormat Readers') || error.message.includes('NotFoundException')) return;
             }
             
             showDebug(`Scan error: ${error}`);
@@ -304,7 +321,7 @@
         function stopScanner() {
             showDebug('Stopping scanner...');
             
-            if (html5QrcodeScanner) {
+            if (html5QrcodeScanner && isScanning) {
                 html5QrcodeScanner.stop()
                     .then(() => {
                         showDebug('Scanner successfully stopped');
@@ -321,15 +338,9 @@
             readerDiv.classList.remove('active');
             overlay.style.display = 'none';
             
-            // Show instruction again
-            if (!readerDiv.querySelector('.instruction')) {
-                const instruction = document.createElement('div');
-                instruction.className = 'instruction';
-                instruction.textContent = 'Click "Start Scanner" to begin';
-                readerDiv.insertBefore(instruction, overlay);
-            } else {
-                readerDiv.querySelector('.instruction').style.display = 'block';
-            }
+            // Show placeholder again
+            placeholder.style.display = 'block';
+            placeholder.textContent = 'Click "Start Scanner" to begin';
             
             showStatus('Scanner stopped.', 'info');
         }
