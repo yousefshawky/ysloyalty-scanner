@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
     <style>
-        /* Your existing CSS remains unchanged */
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             max-width: 500px;
@@ -26,7 +25,7 @@
             margin-bottom: 30px;
             font-size: 24px;
         }
-        #scanner-container {
+        #reader {
             width: 100%;
             height: 300px;
             border: 2px dashed #ddd;
@@ -39,19 +38,9 @@
             align-items: center;
             justify-content: center;
         }
-        #scanner-container.active {
+        #reader.active {
             border-color: #4CAF50;
             background: #f0f9f0;
-        }
-        #video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            border-radius: 10px;
-            display: none;
-        }
-        #canvas {
-            display: none;
         }
         .scanner-overlay {
             position: absolute;
@@ -147,6 +136,10 @@
             max-height: 150px;
             overflow-y: auto;
         }
+        #reader > div {
+            border-radius: 12px !important;
+            overflow: hidden;
+        }
     </style>
 </head>
 <body>
@@ -154,10 +147,8 @@
         <h1>🎯 QR Loyalty Card Scanner</h1>
         <div class="instruction">Camera QR Scanner</div>
         
-        <div id="scanner-container">
-            <div class="instruction">Click "Start Camera" to begin scanning</div>
-            <video id="video" autoplay muted playsinline></video>
-            <canvas id="canvas"></canvas>
+        <div id="reader">
+            <div class="instruction">Click "Start Scanner" to begin</div>
             <div class="scanner-overlay"></div>
         </div>
         
@@ -175,57 +166,15 @@
     </div>
 
     <script>
-        // Use jsQR library for actual QR code decoding
-        function decodeQRCode(imageData) {
-            try {
-                // Convert to grayscale for jsQR
-                const width = imageData.width;
-                const height = imageData.height;
-                const rgbaData = imageData.data;
-                
-                // Create a Uint8ClampedArray representation for jsQR
-                const grayscaleData = new Uint8ClampedArray(width * height);
-                
-                for (let y = 0; y < height; y++) {
-                    for (let x = 0; x < width; x++) {
-                        const idx = (y * width + x) * 4;
-                        // Convert to grayscale using luminance formula
-                        grayscaleData[y * width + x] = 
-                            (rgbaData[idx] * 0.299 + 
-                             rgbaData[idx + 1] * 0.587 + 
-                             rgbaData[idx + 2] * 0.114);
-                    }
-                }
-                
-                // Try to decode using jsQR
-                const code = jsQR(grayscaleData, width, height);
-                
-                if (code) {
-                    showDebug(`QR Code detected and decoded: ${code.data}`);
-                    return code.data;
-                }
-                
-                return null;
-            } catch (error) {
-                showDebug(`Error in QR decoding: ${error.message}`);
-                return null;
-            }
-        }
-
+        let html5QrcodeScanner = null;
         let isScanning = false;
-        let stream = null;
-        let animationId = null;
-        let scanAttempts = 0;
         
         const startBtn = document.getElementById('startScan');
         const stopBtn = document.getElementById('stopScan');
-        const container = document.getElementById('scanner-container');
+        const readerDiv = document.getElementById('reader');
         const statusDiv = document.getElementById('status');
         const debugDiv = document.getElementById('debug');
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const overlay = container.querySelector('.scanner-overlay');
+        const overlay = readerDiv.querySelector('.scanner-overlay');
         
         function showStatus(message, type = 'success', sticky = false) {
             statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
@@ -248,94 +197,79 @@
         function startScanner() {
             if (isScanning) return;
             
-            scanAttempts = 0;
-            debugDiv.innerHTML = '';
-            showDebug('Initializing camera scanner...');
+            showDebug('Initializing QR scanner...');
             
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                showStatus('❌ Camera not supported on this device. Try uploading an image instead.', 'error', true);
-                showDebug('MediaDevices API not available');
+            // Initialize the scanner
+            html5QrcodeScanner = new Html5Qrcode("reader");
+            
+            const config = { 
+                fps: 10, 
+                qrbox: { width: 200, height: 200 },
+                supportedScanTypes: [
+                    Html5QrcodeScanType.SCAN_TYPE_CAMERA
+                ],
+                aspectRatio: 1.0
+            };
+            
+            Html5Qrcode.getCameras()
+                .then(cameras => {
+                    if (cameras && cameras.length) {
+                        showDebug(`Found ${cameras.length} camera(s)`);
+                        
+                        // Prefer back camera if available
+                        const backCamera = cameras.find(camera => camera.label.toLowerCase().includes('back'));
+                        const cameraId = backCamera ? backCamera.id : cameras[0].id;
+                        
+                        showDebug(`Using camera: ${backCamera ? 'Back' : 'First available'}`);
+                        
+                        return html5QrcodeScanner.start(
+                            cameraId,
+                            config,
+                            onScanSuccess,
+                            onScanFailure
+                        );
+                    } else {
+                        showStatus('❌ No cameras found', 'error', true);
+                        showDebug('No cameras detected on this device');
+                        throw new Error('No cameras available');
+                    }
+                })
+                .then(() => {
+                    isScanning = true;
+                    startBtn.style.display = 'none';
+                    stopBtn.style.display = 'block';
+                    readerDiv.classList.add('active');
+                    overlay.style.display = 'block';
+                    readerDiv.querySelector('.instruction').style.display = 'none';
+                    
+                    showStatus('📷 Scanner active - point camera at QR code', 'success');
+                    showDebug('Scanner started successfully');
+                })
+                .catch(err => {
+                    showStatus('❌ Failed to start scanner: ' + err, 'error', true);
+                    showDebug('Scanner error: ' + err);
+                });
+        }
+        
+        function onScanSuccess(decodedText, decodedResult) {
+            showDebug(`QR Code detected: ${decodedText}`);
+            handleQRDetected(decodedText);
+        }
+        
+        function onScanFailure(error) {
+            // Most errors are just because no QR code is detected yet
+            // Only show errors that aren't the expected "not found" type
+            if (!error || 
+                (typeof error === 'string' && error.includes('No MultiFormat Readers')) ||
+                (error && error.message && error.message.includes('No MultiFormat Readers'))) {
                 return;
             }
             
-            showStatus('Requesting camera permission...', 'info');
-            showDebug('Requesting camera access...');
-            
-            const constraints = {
-                video: {
-                    facingMode: { ideal: "environment" },
-                    width: { ideal: 640 },
-                    height: { ideal: 480 }
-                }
-            };
-            
-            navigator.mediaDevices.getUserMedia(constraints)
-                .then(handleStreamSuccess)
-                .catch(handleStreamError);
-        }
-        
-        function handleStreamSuccess(mediaStream) {
-            stream = mediaStream;
-            showDebug('Camera access granted');
-            
-            video.srcObject = stream;
-            video.style.display = 'block';
-            
-            video.addEventListener('loadedmetadata', () => {
-                showDebug(`Video dimensions: ${video.videoWidth}x${video.videoHeight}`);
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                
-                isScanning = true;
-                startBtn.style.display = 'none';
-                stopBtn.style.display = 'block';
-                container.classList.add('active');
-                overlay.style.display = 'block';
-                container.querySelector('.instruction').style.display = 'none';
-                
-                showStatus('📷 Scanner active - point camera at QR code', 'success');
-                showDebug('Starting scan loop...');
-                requestAnimationFrame(scanLoop);
-            });
-        }
-        
-        function handleStreamError(error) {
-            showDebug(`Camera access error: ${error.name} - ${error.message}`);
-            showStatus('❌ Camera access failed. Try uploading an image instead.', 'error', true);
-        }
-        
-        function scanLoop() {
-            if (!isScanning) return;
-            
-            scanAttempts++;
-            
-            if (video.readyState === video.HAVE_ENOUGH_DATA) {
-                try {
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    
-                    // Try to decode QR code
-                    const qrData = decodeQRCode(imageData);
-                    if (qrData) {
-                        handleQRDetected(qrData);
-                        return;
-                    }
-                    
-                    // Log progress every 200 attempts
-                    if (scanAttempts % 200 === 0) {
-                        showDebug(`Scan attempts: ${scanAttempts} - Looking for QR codes...`);
-                    }
-                } catch (error) {
-                    showDebug(`Scan error: ${error.message}`);
-                }
-            }
-            
-            animationId = requestAnimationFrame(scanLoop);
+            showDebug(`Scan error: ${error}`);
         }
         
         function handleQRDetected(scannedText) {
             showStatus(`✅ QR Code Detected!<br><strong>Loyalty ID: ${scannedText}</strong><br>Redirecting in 3 seconds...`, 'success', true);
-            showDebug(`QR data: ${scannedText}`);
             
             // Wait 3 seconds, then redirect
             let countdown = 3;
@@ -369,37 +303,32 @@
         
         function stopScanner() {
             showDebug('Stopping scanner...');
+            
+            if (html5QrcodeScanner) {
+                html5QrcodeScanner.stop()
+                    .then(() => {
+                        showDebug('Scanner successfully stopped');
+                        html5QrcodeScanner.clear();
+                    })
+                    .catch(err => {
+                        showDebug('Error stopping scanner: ' + err);
+                    });
+            }
+            
             isScanning = false;
-            
-            if (animationId) {
-                cancelAnimationFrame(animationId);
-                animationId = null;
-            }
-            
-            if (stream) {
-                stream.getTracks().forEach(track => {
-                    track.stop();
-                    showDebug(`Stopped ${track.kind} track`);
-                });
-                stream = null;
-            }
-            
-            // Reset UI
-            video.style.display = 'none';
-            video.srcObject = null;
             startBtn.style.display = 'block';
             stopBtn.style.display = 'none';
-            container.classList.remove('active');
+            readerDiv.classList.remove('active');
             overlay.style.display = 'none';
             
             // Show instruction again
-            if (!container.querySelector('.instruction')) {
+            if (!readerDiv.querySelector('.instruction')) {
                 const instruction = document.createElement('div');
                 instruction.className = 'instruction';
-                instruction.textContent = 'Click "Start Camera" to begin scanning';
-                container.insertBefore(instruction, video);
+                instruction.textContent = 'Click "Start Scanner" to begin';
+                readerDiv.insertBefore(instruction, overlay);
             } else {
-                container.querySelector('.instruction').style.display = 'block';
+                readerDiv.querySelector('.instruction').style.display = 'block';
             }
             
             showStatus('Scanner stopped.', 'info');
@@ -417,12 +346,13 @@
             }
         });
         
-        window.addEventListener('beforeunload', stopScanner);
+        window.addEventListener('beforeunload', function() {
+            if (isScanning) {
+                stopScanner();
+            }
+        });
         
         showDebug('QR Scanner initialized - ready to use');
     </script>
-    
-    <!-- Include jsQR library for actual QR code decoding -->
-    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 </body>
 </html>
