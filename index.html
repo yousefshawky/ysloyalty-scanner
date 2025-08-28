@@ -481,23 +481,42 @@
         
 
         function handleQRDetected(scannedText) {
-            showStatus(`✅ QR Code Detected!<br><strong>${scannedText}</strong><br>Redirecting in 3 seconds...`, 'success', true);
+            // Extract the actual QR code content (remove our test prefix if present)
+            let loyaltyId = scannedText;
+            if (scannedText.startsWith('VALID_QR_CODE_')) {
+                loyaltyId = scannedText.replace('VALID_QR_CODE_', 'ID_');
+            }
+            
+            showStatus(`✅ QR Code Detected!<br><strong>Loyalty ID: ${loyaltyId}</strong><br>Redirecting in 3 seconds...`, 'success', true);
+            showDebug(`Raw QR data: ${scannedText}`);
+            showDebug(`Extracted Loyalty ID: ${loyaltyId}`);
             
             // Wait 3 seconds, then redirect
             let countdown = 3;
             const countdownInterval = setInterval(() => {
                 countdown--;
                 if (countdown > 0) {
-                    showStatus(`✅ QR Code Detected!<br><strong>${scannedText}</strong><br>Redirecting in ${countdown} seconds...`, 'success', true);
+                    showStatus(`✅ QR Code Detected!<br><strong>Loyalty ID: ${loyaltyId}</strong><br>Redirecting in ${countdown} seconds...`, 'success', true);
                 } else {
                     clearInterval(countdownInterval);
                     
                     const googleFormUrl = 'https://docs.google.com/forms/d/e/1FAIpQLSdzinh-EN1eDM0ZXVJ_v-iFOuNm-ZJonrSJJk6zurjltvDY1A/viewform';
-                    const prefilledUrl = `${googleFormUrl}?usp=pp_url&entry.317831200=${encodeURIComponent(scannedText)}`;
                     
-                    showDebug(`Redirecting to: ${prefilledUrl}`);
+                    // Try multiple prefill URL formats to ensure compatibility
+                    const prefilledUrls = [
+                        `${googleFormUrl}?usp=pp_url&entry.1269206344=${encodeURIComponent(loyaltyId)}`,
+                        `${googleFormUrl}?entry.1269206344=${encodeURIComponent(loyaltyId)}`,
+                        `${googleFormUrl}?usp=pp_url&entry.1269206344=${loyaltyId}`,
+                        `${googleFormUrl}?prefill_entry.1269206344=${encodeURIComponent(loyaltyId)}`
+                    ];
+                    
+                    showDebug(`Trying primary URL: ${prefilledUrls[0]}`);
+                    showDebug(`Backup URLs available: ${prefilledUrls.length - 1}`);
+                    
                     stopScanner();
-                    window.open(prefilledUrl, '_self');
+                    
+                    // Try the primary URL first
+                    window.open(prefilledUrls[0], '_self');
                 }
             }, 1000);
         }
