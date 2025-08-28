@@ -1,222 +1,259 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QR Loyalty Scanner</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.20.0/index.min.js"></script>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      max-width: 500px;
-      margin: 0 auto;
-      padding: 20px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
-    }
-    .container {
-      background: white;
-      border-radius: 16px;
-      padding: 30px;
-      box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-    }
-    h1 {
-      text-align: center;
-      color: #333;
-      margin-bottom: 30px;
-      font-size: 24px;
-    }
-    #scanner-container {
-      width: 100%;
-      height: 300px;
-      border: 2px dashed #ddd;
-      border-radius: 12px;
-      position: relative;
-      overflow: hidden;
-      margin-bottom: 20px;
-      background: #f8f9fa;
-    }
-    #scanner-container.active {
-      border-color: #4CAF50;
-      background: #f0f9f0;
-    }
-    video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      border-radius: 10px;
-    }
-    .scanner-overlay {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 250px;
-      height: 120px;
-      border: 2px solid #4CAF50;
-      border-radius: 8px;
-      pointer-events: none;
-      z-index: 10;
-    }
-    .scanner-overlay::before {
-      content: '';
-      position: absolute;
-      top: -2px;
-      left: -2px;
-      right: -2px;
-      bottom: -2px;
-      border: 2px solid rgba(76, 175, 80, 0.3);
-      border-radius: 8px;
-      animation: pulse 2s ease-in-out infinite;
-    }
-    @keyframes pulse {
-      0%, 100% { opacity: 0.3; transform: scale(1); }
-      50% { opacity: 0.7; transform: scale(1.05); }
-    }
-    button {
-      width: 100%;
-      padding: 15px;
-      font-size: 16px;
-      border: none;
-      border-radius: 12px;
-      cursor: pointer;
-      margin: 10px 0;
-      font-weight: 600;
-      transition: all 0.3s ease;
-    }
-    #startScan {
-      background: linear-gradient(135deg, #4CAF50, #45a049);
-      color: white;
-    }
-    #stopScan {
-      background: linear-gradient(135deg, #f44336, #da190b);
-      color: white;
-      display: none;
-    }
-    .status {
-      text-align: center;
-      padding: 10px;
-      border-radius: 8px;
-      margin: 10px 0;
-      font-weight: 600;
-    }
-    .status.success {
-      background: #d4edda;
-      color: #155724;
-      border: 1px solid #c3e6cb;
-    }
-    .status.error {
-      background: #f8d7da;
-      color: #721c24;
-      border: 1px solid #f5c6cb;
-    }
-    .instruction {
-      text-align: center;
-      color: #666;
-      margin: 15px 0;
-      font-style: italic;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Loyalty Scanner</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.20.0/index.min.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 24px;
+        }
+        #scanner-container {
+            width: 100%;
+            height: 300px;
+            border: 2px dashed #ddd;
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 20px;
+            background: #f8f9fa;
+        }
+        #scanner-container.active {
+            border-color: #4CAF50;
+            background: #f0f9f0;
+        }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 10px;
+        }
+        .scanner-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 250px;
+            height: 120px;
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .scanner-overlay::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            border: 2px solid rgba(76, 175, 80, 0.3);
+            border-radius: 8px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.05); }
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            font-size: 16px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            margin: 10px 0;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        #startScan {
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+        }
+        #stopScan {
+            background: linear-gradient(135deg, #f44336, #da190b);
+            color: white;
+            display: none;
+        }
+        .status {
+            text-align: center;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: 600;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .instruction {
+            text-align: center;
+            color: #666;
+            margin: 15px 0;
+            font-style: italic;
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <h1>🎯 QR Loyalty Card Scanner</h1>
-    <div class="instruction">QR Code Scanner</div>
-
-    <div id="scanner-container">
-      <video id="video" autoplay playsinline></video>
-      <div class="scanner-overlay" style="display: none;"></div>
+    <div class="container">
+        <h1>🎯 QR Loyalty Card Scanner</h1>
+        <div class="instruction">QR Code Scanner</div>
+        
+        <div id="scanner-container">
+            <div class="instruction">Click "Start Scanner" to begin</div>
+            <div class="scanner-overlay" style="display: none;"></div>
+        </div>
+        
+        <button id="startScan">📷 Start Scanner</button>
+        <button id="stopScan">⏹️ Stop Scanner</button>
+        
+        <div id="status"></div>
+        
+        <div class="instruction">
+            📱 Point your camera at the QR code on the loyalty card to automatically redirect to the form.
+        </div>
     </div>
 
-    <button id="startScan">📷 Start Scanner</button>
-    <button id="stopScan">⏹️ Stop Scanner</button>
-
-    <div id="status"></div>
-
-    <div class="instruction">
-      📱 Point your camera at the QR code on the loyalty card to automatically redirect to the form.
-    </div>
-  </div>
-
-  <script>
-    let isScanning = false;
-    let codeReader = null;
-
-    const startBtn = document.getElementById('startScan');
-    const stopBtn = document.getElementById('stopScan');
-    const container = document.getElementById('scanner-container');
-    const statusDiv = document.getElementById('status');
-    const overlay = container.querySelector('.scanner-overlay');
-
-    function showStatus(message, type = 'success') {
-      statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
-    }
-
-    async function startScanner() {
-      if (isScanning) return;
-
-      codeReader = new ZXing.BrowserQRCodeReader();
-
-      try {
-        const devices = await codeReader.listVideoInputDevices();
-        const backCamera = devices.find(d => d.label.toLowerCase().includes('back')) || devices[0];
-
-        isScanning = true;
-        startBtn.style.display = 'none';
-        stopBtn.style.display = 'block';
-        container.classList.add('active');
-        overlay.style.display = 'block';
-
-        showStatus('📷 Scanner active - point camera at QR code', 'success');
-
-        codeReader.decodeFromVideoDevice(backCamera.deviceId, 'video', (result, err) => {
-          if (result) {
-            const scannedText = result.getText();
-            console.log('QR Code detected:', scannedText);
-
-            showStatus(`✅ Scanned: ${scannedText} - Redirecting...`, 'success');
-            stopScanner();
-
-            setTimeout(() => {
-              const googleFormUrl = 'https://docs.google.com/forms/d/e/1FAIpQLSdzinh-EN1eDM0ZXVJ_v-iFOuNm-ZJonrSJJk6zurjltvDY1A/viewform';
-              const prefilledUrl = `${googleFormUrl}?usp=pp_url&entry.317831200=${encodeURIComponent(scannedText)}`;
-              window.open(prefilledUrl, '_self');
-            }, 1500);
-          }
-
-          if (err && !(err instanceof ZXing.NotFoundException)) {
-            console.error('Scanning error:', err);
-          }
+    <script>
+        let isScanning = false;
+        let codeReader = null;
+        let stream = null;
+        
+        const startBtn = document.getElementById('startScan');
+        const stopBtn = document.getElementById('stopScan');
+        const container = document.getElementById('scanner-container');
+        const statusDiv = document.getElementById('status');
+        const overlay = container.querySelector('.scanner-overlay');
+        
+        function showStatus(message, type = 'success') {
+            statusDiv.innerHTML = `<div class="status ${type}">${message}</div>`;
+        }
+        
+        function startScanner() {
+            if (isScanning) return;
+            
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                showStatus('Requesting camera permission...', 'success');
+                
+                navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: "environment",
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    } 
+                })
+                .then(function(mediaStream) {
+                    stream = mediaStream;
+                    initializeScanner();
+                })
+                .catch(function(error) {
+                    console.error('Camera permission denied:', error);
+                    showStatus('❌ Camera access denied. Please allow camera access and try again.', 'error');
+                });
+            } else {
+                showStatus('❌ Camera not supported on this device.', 'error');
+            }
+        }
+        
+        function initializeScanner() {
+            isScanning = true;
+            startBtn.style.display = 'none';
+            stopBtn.style.display = 'block';
+            container.classList.add('active');
+            overlay.style.display = 'block';
+            
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            video.autoplay = true;
+            video.playsInline = true;
+            container.appendChild(video);
+            
+            // ✅ Use QR-only reader
+            codeReader = new ZXing.BrowserQRCodeReader();
+            
+            showStatus('📷 Scanner active - point camera at QR code', 'success');
+            
+            // Start scanning
+            codeReader.decodeFromVideoDevice(null, video, (result, err) => {
+                if (result) {
+                    const scannedText = result.getText();
+                    console.log('QR detected:', scannedText);
+                    
+                    showStatus(`✅ Scanned: ${scannedText} - Redirecting...`, 'success');
+                    stopScanner();
+                    
+                    setTimeout(() => {
+                        const googleFormUrl = 'https://docs.google.com/forms/d/e/1FAIpQLSdzinh-EN1eDM0ZXVJ_v-iFOuNm-ZJonrSJJk6zurjltvDY1A/viewform';
+                        const prefilledUrl = `${googleFormUrl}?usp=pp_url&entry.317831200=${encodeURIComponent(scannedText)}`;
+                        window.open(prefilledUrl, '_self');
+                    }, 1500);
+                }
+                
+                if (err && !(err instanceof ZXing.NotFoundException)) {
+                    console.error('Scanning error:', err);
+                }
+            });
+        }
+        
+        function stopScanner() {
+            if (!isScanning) return;
+            
+            isScanning = false;
+            startBtn.style.display = 'block';
+            stopBtn.style.display = 'none';
+            container.classList.remove('active');
+            overlay.style.display = 'none';
+            
+            if (codeReader) {
+                codeReader.reset();
+                codeReader = null;
+            }
+            
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            
+            const video = container.querySelector('video');
+            if (video) {
+                video.remove();
+            }
+            
+            container.innerHTML = '<div class="instruction">Click "Start Scanner" to begin</div><div class="scanner-overlay" style="display: none;"></div>';
+        }
+        
+        startBtn.addEventListener('click', startScanner);
+        stopBtn.addEventListener('click', stopScanner);
+        
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden && isScanning) {
+                stopScanner();
+            }
         });
-      } catch (e) {
-        console.error(e);
-        showStatus('❌ Could not access camera. Please allow permissions.', 'error');
-      }
-    }
-
-    function stopScanner() {
-      if (!isScanning) return;
-
-      isScanning = false;
-      startBtn.style.display = 'block';
-      stopBtn.style.display = 'none';
-      container.classList.remove('active');
-      overlay.style.display = 'none';
-
-      if (codeReader) {
-        codeReader.reset();
-        codeReader = null;
-      }
-    }
-
-    startBtn.addEventListener('click', startScanner);
-    stopBtn.addEventListener('click', stopScanner);
-
-    document.addEventListener('visibilitychange', function() {
-      if (document.hidden && isScanning) {
-        stopScanner();
-      }
-    });
-  </script>
+    </script>
 </body>
 </html>
