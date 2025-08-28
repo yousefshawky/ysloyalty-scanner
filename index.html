@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PassKit Loyalty Scanner</title>
+    <title>PassKit Loyalty QR Scanner</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.20.0/index.min.js"></script>
     <style>
         body {
@@ -57,10 +57,10 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 250px;
-            height: 120px;
-            border: 2px solid #4CAF50;
-            border-radius: 8px;
+            width: 200px;
+            height: 200px;
+            border: 3px solid #4CAF50;
+            border-radius: 12px;
             pointer-events: none;
             z-index: 10;
         }
@@ -68,13 +68,52 @@
         .scanner-overlay::before {
             content: '';
             position: absolute;
-            top: -2px;
-            left: -2px;
-            right: -2px;
-            bottom: -2px;
-            border: 2px solid rgba(76, 175, 80, 0.3);
-            border-radius: 8px;
+            top: -3px;
+            left: -3px;
+            right: -3px;
+            bottom: -3px;
+            border: 3px solid rgba(76, 175, 80, 0.3);
+            border-radius: 12px;
             animation: pulse 2s ease-in-out infinite;
+        }
+        
+        .scanner-overlay::after {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            width: 30px;
+            height: 30px;
+            border-top: 4px solid #4CAF50;
+            border-left: 4px solid #4CAF50;
+        }
+        
+        .scanner-overlay .corner {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            border: 4px solid #4CAF50;
+        }
+        
+        .scanner-overlay .corner.top-right {
+            top: 10px;
+            right: 10px;
+            border-bottom: none;
+            border-left: none;
+        }
+        
+        .scanner-overlay .corner.bottom-left {
+            bottom: 10px;
+            left: 10px;
+            border-top: none;
+            border-right: none;
+        }
+        
+        .scanner-overlay .corner.bottom-right {
+            bottom: 10px;
+            right: 10px;
+            border-top: none;
+            border-left: none;
         }
         
         @keyframes pulse {
@@ -145,21 +184,25 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎯 Loyalty Card Scanner</h1>
-        <div class="instruction">PDF417 & Barcode Scanner</div>
+        <h1>📱 Loyalty QR Scanner</h1>
+        <div class="instruction">QR Code Scanner</div>
         
         <div id="scanner-container">
             <div class="instruction">Click "Start Scanner" to begin</div>
-            <div class="scanner-overlay" style="display: none;"></div>
+            <div class="scanner-overlay" style="display: none;">
+                <div class="corner top-right"></div>
+                <div class="corner bottom-left"></div>
+                <div class="corner bottom-right"></div>
+            </div>
         </div>
         
-        <button id="startScan">📷 Start Scanner</button>
+        <button id="startScan">📷 Start QR Scanner</button>
         <button id="stopScan">⏹️ Stop Scanner</button>
         
         <div id="status"></div>
         
         <div class="instruction">
-            📱 Point your camera at the PDF417 barcode on the loyalty card to automatically redirect to the form.
+            📱 Point your camera at the QR code on the loyalty card to automatically redirect to the form.
         </div>
     </div>
 
@@ -224,10 +267,10 @@
             video.playsInline = true;
             container.appendChild(video);
             
-            // Initialize ZXing code reader for PDF417 and other formats
-            codeReader = new ZXing.BrowserMultiFormatReader();
+            // Initialize ZXing QR Code reader specifically
+            codeReader = new ZXing.BrowserQRCodeReader();
             
-            showStatus('📷 Scanner active - point camera at PDF417 barcode', 'success');
+            showStatus('📱 QR Scanner active - point camera at QR code', 'success');
             
             // Start scanning
             scanFromVideoDevice();
@@ -246,9 +289,9 @@
                     const result = codeReader.decodeFromVideoDevice(null, video, (result, err) => {
                         if (result) {
                             const scannedText = result.getText();
-                            console.log('Barcode detected:', scannedText);
+                            console.log('QR Code detected:', scannedText);
                             
-                            showStatus(`✅ Scanned: ${scannedText} - Redirecting to form...`, 'success');
+                            showStatus(`✅ QR Code Scanned: ${scannedText.substring(0, 50)}${scannedText.length > 50 ? '...' : ''} - Redirecting to form...`, 'success');
                             stopScanner();
                             
                             // Redirect to Google Form with pre-filled PassKit ID
@@ -305,7 +348,7 @@
             }
             
             // Reset container
-            container.innerHTML = '<div class="instruction">Click "Start Scanner" to begin</div><div class="scanner-overlay" style="display: none;"></div>';
+            container.innerHTML = '<div class="instruction">Click "Start Scanner" to begin</div><div class="scanner-overlay" style="display: none;"><div class="corner top-right"></div><div class="corner bottom-left"></div><div class="corner bottom-right"></div></div>';
         }
         
         // Button event listeners
