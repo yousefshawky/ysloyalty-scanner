@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PassKit Loyalty QR Scanner</title>
+    <title>QR Loyalty Scanner</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/zxing-js/0.20.0/index.min.js"></script>
     <style>
         body {
@@ -57,10 +57,10 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 200px;
-            height: 200px;
-            border: 3px solid #4CAF50;
-            border-radius: 12px;
+            width: 250px;
+            height: 120px;
+            border: 2px solid #4CAF50;
+            border-radius: 8px;
             pointer-events: none;
             z-index: 10;
         }
@@ -68,52 +68,13 @@
         .scanner-overlay::before {
             content: '';
             position: absolute;
-            top: -3px;
-            left: -3px;
-            right: -3px;
-            bottom: -3px;
-            border: 3px solid rgba(76, 175, 80, 0.3);
-            border-radius: 12px;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            border: 2px solid rgba(76, 175, 80, 0.3);
+            border-radius: 8px;
             animation: pulse 2s ease-in-out infinite;
-        }
-        
-        .scanner-overlay::after {
-            content: '';
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            width: 30px;
-            height: 30px;
-            border-top: 4px solid #4CAF50;
-            border-left: 4px solid #4CAF50;
-        }
-        
-        .scanner-overlay .corner {
-            position: absolute;
-            width: 30px;
-            height: 30px;
-            border: 4px solid #4CAF50;
-        }
-        
-        .scanner-overlay .corner.top-right {
-            top: 10px;
-            right: 10px;
-            border-bottom: none;
-            border-left: none;
-        }
-        
-        .scanner-overlay .corner.bottom-left {
-            bottom: 10px;
-            left: 10px;
-            border-top: none;
-            border-right: none;
-        }
-        
-        .scanner-overlay .corner.bottom-right {
-            bottom: 10px;
-            right: 10px;
-            border-top: none;
-            border-left: none;
         }
         
         @keyframes pulse {
@@ -184,19 +145,15 @@
 </head>
 <body>
     <div class="container">
-        <h1>📱 Loyalty QR Scanner</h1>
+        <h1>🎯 QR Loyalty Card Scanner</h1>
         <div class="instruction">QR Code Scanner</div>
         
         <div id="scanner-container">
-            <div class="instruction">Click "Start Scanner" to begin</div>
-            <div class="scanner-overlay" style="display: none;">
-                <div class="corner top-right"></div>
-                <div class="corner bottom-left"></div>
-                <div class="corner bottom-right"></div>
-            </div>
+            <video id="video"></video>
+            <div class="scanner-overlay" style="display: none;"></div>
         </div>
         
-        <button id="startScan">📷 Start QR Scanner</button>
+        <button id="startScan">📷 Start Scanner</button>
         <button id="stopScan">⏹️ Stop Scanner</button>
         
         <div id="status"></div>
@@ -209,7 +166,6 @@
     <script>
         let isScanning = false;
         let codeReader = null;
-        let stream = null;
         
         const startBtn = document.getElementById('startScan');
         const stopBtn = document.getElementById('stopScan');
@@ -229,123 +185,35 @@
         function startScanner() {
             if (isScanning) return;
             
-            // Check for camera permission first
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                showStatus('Requesting camera permission...', 'success');
-                
-                navigator.mediaDevices.getUserMedia({ 
-                    video: { 
-                        facingMode: "environment",
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    } 
-                })
-                .then(function(mediaStream) {
-                    stream = mediaStream;
-                    initializeScanner();
-                })
-                .catch(function(error) {
-                    console.error('Camera permission denied:', error);
-                    showStatus('❌ Camera access denied. Please allow camera access and try again.', 'error');
-                });
-            } else {
-                showStatus('❌ Camera not supported on this device.', 'error');
-            }
-        }
-        
-        function initializeScanner() {
+            codeReader = new ZXing.BrowserQRCodeReader();
+            
             isScanning = true;
             startBtn.style.display = 'none';
             stopBtn.style.display = 'block';
             container.classList.add('active');
             overlay.style.display = 'block';
             
-            // Create video element
-            const video = document.createElement('video');
-            video.srcObject = stream;
-            video.autoplay = true;
-            video.playsInline = true;
-            video.muted = true; // Add muted attribute for autoplay
-            container.appendChild(video);
+            showStatus('📷 Scanner active - point camera at QR code', 'success');
             
-            // Initialize ZXing QR Code reader specifically
-            try {
-                codeReader = new ZXing.BrowserQRCodeReader();
-                console.log('QR Code reader initialized');
-                
-                showStatus('📱 QR Scanner active - point camera at QR code', 'success');
-                
-                // Start scanning after a short delay to ensure video is ready
-                setTimeout(() => {
-                    scanFromVideoDevice();
-                }, 500);
-                
-            } catch (error) {
-                console.error('Failed to initialize QR code reader:', error);
-                showStatus('❌ Failed to initialize scanner. Please refresh and try again.', 'error');
-                stopScanner();
-            }
-        }
-        
-        function scanFromVideoDevice() {
-            const video = container.querySelector('video');
-            
-            if (!video || !isScanning) return;
-            
-            // Wait for video to be ready
-            video.addEventListener('loadedmetadata', () => {
-                if (!isScanning) return;
-                
-                console.log('Video ready, starting QR scan...');
-                
-                // Start continuous scanning
-                codeReader.decodeFromVideoDevice(null, video, (result, err) => {
-                    if (result && isScanning) {
-                        const scannedText = result.getText();
-                        console.log('QR Code detected:', scannedText);
-                        
-                        showStatus(`✅ QR Code Scanned: ${scannedText.substring(0, 50)}${scannedText.length > 50 ? '...' : ''} - Redirecting to form...`, 'success');
-                        stopScanner();
-                        
-                        // Redirect to Google Form with pre-filled PassKit ID
-                        setTimeout(() => {
-                            const googleFormUrl = 'https://docs.google.com/forms/d/e/1FAIpQLSdzinh-EN1eDM0ZXVJ_v-iFOuNm-ZJonrSJJk6zurjltvDY1A/viewform';
-                            const prefilledUrl = `${googleFormUrl}?usp=pp_url&entry.317831200=${encodeURIComponent(scannedText)}`;
-                            window.location.href = prefilledUrl;
-                        }, 1500);
-                    }
+            codeReader.decodeFromVideoDevice(null, 'video', (result, err) => {
+                if (result) {
+                    const scannedText = result.getText();
+                    console.log('QR Code detected:', scannedText);
                     
-                    if (err && !(err instanceof ZXing.NotFoundException)) {
-                        console.error('Scanning error:', err);
-                    }
-                });
+                    showStatus(`✅ Scanned: ${scannedText} - Redirecting to form...`, 'success');
+                    stopScanner();
+                    
+                    setTimeout(() => {
+                        const googleFormUrl = 'https://docs.google.com/forms/d/e/1FAIpQLSdzinh-EN1eDM0ZXVJ_v-iFOuNm-ZJonrSJJk6zurjltvDY1A/viewform';
+                        const prefilledUrl = `${googleFormUrl}?usp=pp_url&entry.317831200=${encodeURIComponent(scannedText)}`;
+                        window.open(prefilledUrl, '_self');
+                    }, 1500);
+                }
+                
+                if (err && !(err instanceof ZXing.NotFoundException)) {
+                    console.error('Scanning error:', err);
+                }
             });
-            
-            // If video is already loaded, start immediately
-            if (video.readyState >= 1) {
-                console.log('Video already ready, starting QR scan...');
-                
-                codeReader.decodeFromVideoDevice(null, video, (result, err) => {
-                    if (result && isScanning) {
-                        const scannedText = result.getText();
-                        console.log('QR Code detected:', scannedText);
-                        
-                        showStatus(`✅ QR Code Scanned: ${scannedText.substring(0, 50)}${scannedText.length > 50 ? '...' : ''} - Redirecting to form...`, 'success');
-                        stopScanner();
-                        
-                        // Redirect to Google Form with pre-filled PassKit ID
-                        setTimeout(() => {
-                            const googleFormUrl = 'https://docs.google.com/forms/d/e/1FAIpQLSdzinh-EN1eDM0ZXVJ_v-iFOuNm-ZJonrSJJk6zurjltvDY1A/viewform';
-                            const prefilledUrl = `${googleFormUrl}?usp=pp_url&entry.317831200=${encodeURIComponent(scannedText)}`;
-                            window.location.href = prefilledUrl;
-                        }, 1500);
-                    }
-                    
-                    if (err && !(err instanceof ZXing.NotFoundException)) {
-                        console.error('Scanning error:', err);
-                    }
-                });
-            }
         }
         
         function stopScanner() {
@@ -357,33 +225,15 @@
             container.classList.remove('active');
             overlay.style.display = 'none';
             
-            // Stop the code reader
             if (codeReader) {
                 codeReader.reset();
                 codeReader = null;
             }
-            
-            // Stop the video stream
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-                stream = null;
-            }
-            
-            // Remove video element
-            const video = container.querySelector('video');
-            if (video) {
-                video.remove();
-            }
-            
-            // Reset container
-            container.innerHTML = '<div class="instruction">Click "Start Scanner" to begin</div><div class="scanner-overlay" style="display: none;"><div class="corner top-right"></div><div class="corner bottom-left"></div><div class="corner bottom-right"></div></div>';
         }
         
-        // Button event listeners
         startBtn.addEventListener('click', startScanner);
         stopBtn.addEventListener('click', stopScanner);
         
-        // Handle page visibility changes
         document.addEventListener('visibilitychange', function() {
             if (document.hidden && isScanning) {
                 stopScanner();
